@@ -99,3 +99,174 @@ bundle exec rake db:migrate
 bundle exec rake db:migrate RAILS_ENV=test
 bundle exec rake 
 ```
+
+### Setup app
+
+Create app folder and init git
+```
+cd
+mkdir capstone_demoapp
+git init .
+echo "# Capstone Demo Application" > README.md
+git add README.md
+git commit -m "initial commit"
+```
+Create app in current directory (use 'new .', -T - no test)
+```
+rails-api new . -T -d postgresql
+```
+Adjust database.yml
+```
+default: &default
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  username: <%= ENV['POSTGRES_USER'] %>
+  password: <%= ENV['POSTGRES_PASSWORD'] %>
+  host: <%= ENV['POSTGRES_HOST'] %>
+
+development:
+  <<: *default
+  database: capstone_demoapp_development
+
+test:
+  <<: *default
+  database: capstone_demoapp_test
+
+production:
+  adapter: postgresql
+  encoding: unicode
+  pool: 5
+  url: <%= ENV['DATABASE_URL'] %>
+```
+Setup Gemfile
+```
+# 
+source 'https://rubygems.org'
+
+gem 'rails', '4.2.6'
+gem 'rails-api', '~>0.4', '>=0.4.0'
+
+gem 'jbuilder', '~> 2.0', '>=2.6.0'
+
+group :development do
+  gem 'spring', '~>2.0', '>=2.0.0'
+end
+
+group :development, :test do
+  gem 'rspec-rails', '~> 3.5', '>=3.5.2'
+end
+
+gem 'pg', '0.20.0'
+ ```
+Rund Bundle
+```
+bundle
+```
+Add to app/controller/application_controller.rb
+```
+class ApplicationController < ActionController::API
+  #make the connection between controller action and associated view
+  include ActionController::ImplicitRender
+end
+```
+Run rails server and check
+```
+rails s
+```
+Install Rspec
+```
+rails g rspec:install
+```
+Generate test
+```
+rails g rspec:request APIDevelopment
+```
+Add to test file
+```
+require 'rails_helper'
+
+RSpec.describe "ApiDevelopments", type: :request do
+  describe "RDBMS-backed" do
+    it "create RDBMS-backed model"
+    it "expose RDBMS-backed API resource"
+  end
+
+  describe "MongoDB-backed" do
+    it "create MongoDB-backed model"
+    it "expose MongoDB-backed API resource"
+  end
+end
+```
+Check the test
+```
+rspec -fg # with formal documentation
+```
+Update test with
+```require 'rails_helper'
+
+RSpec.describe "ApiDevelopments", type: :request do
+  def parsed_body
+    JSON.parse(response.body)
+  end
+
+  describe "RDBMS-backed" do
+    before(:each) { Foo.delete_all }
+    after(:each)  { Foo.delete_all }
+
+    it "create RDBMS-backed model" do
+      object=Foo.create(:name=>"test")
+      expect(Foo.find(object.id).name).to eq("test")
+    end
+
+    it "expose RDBMS-backed API resource" do
+      object=Foo.create(:name=>"test")
+      expect(foos_path).to eq("/api/foos")
+      get foo_path(object.id)
+      expect(response).to have_http_status(:ok)
+      expect(parsed_body["name"]).to eq("test")
+    end
+  end
+
+  describe "MongoDB-backed" do
+    before(:each) { Bar.delete_all }
+    after(:each)  { Bar.delete_all }
+
+    it "create MongoDB-backed model" do
+      object=Bar.create(:name=>"test")
+      expect(Bar.find(object.id).name).to eq("test")
+    end
+    
+    it "expose MongoDB-backed API resource" do
+      object=Bar.create(:name=>"test")
+      expect(bars_path).to eq("/api/bars")
+      get bar_path(object.id) 
+      expect(response).to have_http_status(:ok)
+      expect(parsed_body["name"]).to eq("test")
+    end
+  end
+end
+```
+
+### Controllers
+
+Add controller without defaults rspec and remove model spec
+```
+rails-api g scaffold Foo name --orm active-record --no-request-specs --no-routing-specs --no-controller-specs
+rm spec/model/foo_spec.rb
+```
+Create a table for Foo model, perform migrate
+```
+rake db:migrate
+```
+Check DB (go to db shell)
+```
+rails db
+\d # list of tables
+\d foos # table structure
+\q # exit
+```
+Run rspec test
+``` 
+rspec - e RDBMS -fd
+```
