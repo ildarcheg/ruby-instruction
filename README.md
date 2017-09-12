@@ -247,9 +247,8 @@ RSpec.describe "ApiDevelopments", type: :request do
   end
 end
 ```
-
-### Controllers
-
+### Controllers and routes 
+#### Foo postgresql
 Add controller without defaults rspec and remove model spec
 ```
 rails-api g scaffold Foo name --orm active-record --no-request-specs --no-routing-specs --no-controller-specs
@@ -269,4 +268,261 @@ rails db
 Run rspec test
 ``` 
 rspec - e RDBMS -fd
+```
+Check controller and comment defaults renders 
+```
+class FoosController < ApplicationController
+  before_action :set_foo, only: [:show, :update, :destroy]
+
+  def index
+    @foos = Foo.all
+    #render json: @foos
+  end
+
+  def show
+    render json: @foo
+  end
+
+  def create
+    @foo = Foo.new(foo_params)
+
+    if @foo.save
+      #render json: @foo, status: :created, location: @foo
+      render :show, status: :created, location: @foo
+    else
+      render json: @foo.errors, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    if @foo.update(foo_params)
+      head :no_content
+    else
+      render json: @foo.errors, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @foo.destroy
+
+    head :no_content
+  end
+
+  private
+
+    def set_foo
+      @foo = Foo.find(params[:id])
+    end
+
+    def foo_params
+      params.require(:foo).permit(:name)
+    end
+end
+```
+Add API route to routes
+```
+Rails.application.routes.draw do
+  scope :api defaults: {format: :json} do 
+    resources :foos, except: [:new, :edit]
+  end   
+end
+```
+Run test for RDBMS
+```
+rspec -e RDBMS -fd
+```
+Create first object in DB, run server and check in browser localhost:3000/api/foos
+```
+rails c
+Foo.create(:name=>"test")
+exit
+rails s
+```
+#### Bar mongodb
+Add mongoid to Gemfile, run bundle ang mongoid config (create mongoid.yml)
+```
+#gem 'mongoid', '~>5.1', '>=5.1.5'
+bundle 
+rails g mongoid:config
+```
+Update mongoid.yml with
+```
+development:
+  clients:
+    default:
+      database: myapp_development
+      hosts:
+        - <%= ENV['MONGO_HOST'] ||= "localhost:27017" %>
+      options:
+  options:
+test:
+  clients:
+    default:
+      database: myapp_test
+      hosts:
+        - <%= ENV['MONGO_HOST'] ||= "localhost:27017" %>
+      options:
+        read:
+          mode: :primary
+        max_pool_size: 1
+production:
+  clients:
+    default:
+      uri: <%= ENV['MLAB_URI'] %>
+      options:
+        connect_timeout: 15
+```
+Update config/application.rb with
+```
+ Mongoid.load!('./config/mongoid.yml')
+ #which default ORM are we using with scaffold
+ #add  --orm mongoid, or active_record 
+ #    to rails generate cmd line to be specific
+ config.generators {|g| g.orm :active_record}
+ #config.generators {|g| g.orm :mongoid}
+````
+Add controller without defaults rspec and remove model spec
+```
+rails-api g scaffold Bar name --orm mongoid --no-request-specs --no-routing-specs --no-controller-specs
+rm spec/model/bar_spec.rb
+```
+Update controller with
+```
+class BarsController < ApplicationController
+  before_action :set_bar, only: [:show, :update, :destroy]
+
+  def index
+    @bars = Bar.all
+    #render json: @bars
+  end
+
+  def show
+    #render json: @bar
+  end
+
+  def create
+    @bar = Bar.new(bar_params)
+
+    if @bar.save
+      #render json: @bar, status: :created, location: @bar
+      render :show, status: :created, location: @bar
+    else
+      render json: @bar.errors, status: :unprocessable_entity
+    end
+  end
+
+  def update
+    if @bar.update(bar_params)
+      head :no_content
+    else
+      render json: @bar.errors, status: :unprocessable_entity
+    end
+  end
+
+  def destroy
+    @bar.destroy
+
+    head :no_content
+  end
+
+  private
+
+    def set_bar
+      @bar = Bar.find(params[:id])
+    end
+
+    def bar_params
+      params.require(:bar).permit(:name)
+    end
+end
+```
+Update Bar model with
+```
+class Bar
+  include Mongoid::Document
+  include Mongoid::Timestamps
+  field :name, type: String
+end
+```
+Add API route to routes
+```
+Rails.application.routes.draw do
+  scope :api defaults: {format: :json} do 
+    resources :foos, except: [:new, :edit]
+    resources :bars, except: [:new, :edit]
+  end   
+end
+```
+Update app/views/bar/_bar.json.jbuilder with
+```
+#json.extract! bar, :id, :name, :created_at, :updated_at
+
+json.id bar.id.to_s
+json.name bar.name
+json.created_at bar.created_at
+json.updated_at bar.updated_at
+
+json.url bar_url(bar, format: :json)
+```
+Update test with
+```
+require 'rails_helper'
+
+RSpec.describe "ApiDevelopments", type: :request do
+  def parsed_body
+    JSON.parse(response.body)
+  end
+
+  describe "RDBMS-backed" do
+    before(:each) { Foo.delete_all }
+    after(:each)  { Foo.delete_all }
+
+    it "create RDBMS-backed model" do
+      object=Foo.create(:name=>"test")
+      expect(Foo.find(object.id).name).to eq("test")
+    end
+
+    it "expose RDBMS-backed API resource" do
+      object=Foo.create(:name=>"test")
+      expect(foos_path).to eq("/api/foos")
+      get foo_path(object.id)
+      expect(response).to have_http_status(:ok)
+      expect(parsed_body["name"]).to eq("test")
+    end
+  end
+
+  describe "MongoDB-backed" do
+    before(:each) { Bar.delete_all }
+    after(:each)  { Bar.delete_all }
+
+    it "create MongoDB-backed model" do
+      object=Bar.create(:name=>"test")
+      expect(Bar.find(object.id).name).to eq("test")
+    end
+    
+    it "expose MongoDB-backed API resource" do
+      object=Bar.create(:name=>"test")
+      expect(bars_path).to eq("/api/bars")
+      get bar_path(object.id) 
+      expect(response).to have_http_status(:ok)
+      expect(parsed_body["name"]).to eq("test")
+      expect(parsed_body).to include("created_at")
+      expect(parsed_body).to include("id"=>object.id.to_s)
+    end
+  end
+end
+````
+Run test for MongoDB
+```
+rspec -e MongoDB -fd
+```
+Create few instances on MongoDB
+```
+rails c
+pp (1..3).each.map { |idx| Bar.create(:name=>"test#{idx}") }; nil
+quit
+```
+Check in browser localhost:3000/api/bars
+```
+rails s
 ```
