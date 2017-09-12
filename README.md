@@ -526,3 +526,105 @@ Check in browser localhost:3000/api/bars
 ```
 rails s
 ```
+### HTTP 
+Update Gemfile (dev and test) with
+```
+gem 'httparty', '~>0.14', '>=0.14.0'
+```
+Update config/application.rb for CORS with
+```
+# update Gemfile with gem 'rack-cors', '~>0.4', '>=0.4.0', :require => 'rack/cors'
+config.middleware.insert_before 0, "Rack::Cors" do
+  allow do
+    origins '*'
+    #origins 'siteB.com' 
+
+    resource '/api/*', 
+      :headers => :any, 
+      :methods => [:get, :post, :put, :delete, :options]
+  end
+end
+``` 
+###Additional setup
+Update Gemfile for Puma browser with 
+```
+gem 'puma', '~>3.6', '>=3.6.0', :platforms=>:ruby
+```
+Update Gemfile for debugging with and use 'byebug' inside the code
+```
+gem 'byebug', '~>9.0', '>=9.0.6' # for dev and test
+```
+Update Gemfile for advanced console and debuggins with 
+```
+gem 'pry-rails', '~>0.3', '>=0.3.4'
+gem 'pry-byebug', '~>3.4', '>=3.4.0' # for dev and test
+```
+### HEROKU
+Update Gemfile with 
+```
+group :production do
+  gem 'rails_12factor', '~>0.0', '>= 0.0.3'
+end
+```
+### UI
+Create UI 
+```
+rails g controller ui
+rm spec/controllers/ui_controller_spec.rb
+mkdir echo "Capstone Site Under Construction -- check back soon" > app/views/ui/index.html.erb
+```
+Update routes with
+```
+get '/ui' => 'ui#index'
+get '/ui#' => 'ui#index'   
+root "ui#index"
+```
+Install heroku
+```
+brew install heroku/brew/heroku
+```
+Create app with remote rep named 'staging' and 'production'
+```
+heroku create AppName-staging --remote staging
+heroku create AppName-production --remote production
+git remote -v
+```
+Create a branch for staging
+```
+git checkout -b staging-app
+git branch
+```
+Push local 'staging-app' branch to 'staging' remote rep 'master' branch
+```
+git push staging staging-app:master
+```
+Check logs for errors
+```
+heroku logs --remote staging
+```
+Run migrate for Foos
+```
+heroku run rake db:migrate --remote staging
+```
+Check environment variables and setup MLAB_URI
+```
+heroku config --remote staging
+heroku config:set MLAB_URI=mongodb://<dbuser>:<dbpassword>@ds133054.mlab.com:33054/capstone-staging --remote staging
+heroku config --remote staging
+```
+Create Procfile with
+```
+web: bundle exec puma -C config/puma.rb
+```
+Turn on ssl on production - config/environments/production.rb
+```
+config.force_ssl = true
+```
+### MERGE and PUSH
+Merge master with staging-app
+```
+git checkout master
+git merge staging-app
+git push production master
+```
+
