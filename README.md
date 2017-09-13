@@ -251,7 +251,7 @@ end
 #### Foo postgresql
 Add controller without defaults rspec and remove model spec
 ```
-rails-api g scaffold Foo name --orm active-record --no-request-specs --no-routing-specs --no-controller-specs
+rails-api g scaffold Foo name --orm active_record --no-request-specs --no-routing-specs --no-controller-specs
 rm spec/model/foo_spec.rb
 ```
 Create a table for Foo model, perform migrate
