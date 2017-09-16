@@ -665,6 +665,7 @@ echo -e "/*\n * SPA Demo Stylesheet Manifest file\n */" >> app/assets/stylesheet
 echo -e "// SPA Demo Javascript Manifest File" >> app/assets/javascripts/spa-demo.js
 ```
 Create initializer config file
+```
 echo -e "Rails.application.config.assets.version = '1.0'" >> config/initializers/assets.rb
 echo -e "Rails.application.config.assets.precompile += %w( spa-demo.js spa-demo.css )" >> config/initializers/assets.rb
 ```
