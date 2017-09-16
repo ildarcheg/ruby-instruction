@@ -1,5 +1,6 @@
 # ruby-instruction
 
+## MODULE 1
 ### Install Ruby
 
 Install Brew
@@ -628,3 +629,475 @@ git merge staging-app
 git push production master
 ```
 
+## MODULE 2
+### ASSETS PIPELINE
+Get back to master and create asset-pipeline branch
+```
+git checkout master
+git checkout -b asset-pipeline
+```
+Update Gemfile with 
+```
+gem 'sass-rails', '~> 5.0', '>=3.4.22'
+gem 'uglifier', '~> 3.0', '>=3.0.2'
+gem 'coffee-rails', '~> 4.1', '>= 4.1.0'
+gem 'jquery-rails', '~>4.2', '>=4.2.1'
+
+source 'https://rails-assets.org' do
+  gem 'rails-assets-bootstrap', '~>3.3', '>= 3.3.7'
+  gem 'rails-assets-angular', '~>1.5', '>= 1.5.8'
+  gem 'rails-assets-angular-ui-router', '~>0.3', '>= 0.3.1'
+  gem 'rails-assets-angular-resource', '~>1.5', '>= 1.5.8'
+end
+```
+Run bundle
+```
+bundle
+```
+Create additional folder for assets in app/assets
+```
+mkdir app/assets/stylesheets
+mkdir app/assets/javascripts
+```
+Creare CSS manifest and JS manifest
+```
+echo -e "/*\n * SPA Demo Stylesheet Manifest file\n */" >> app/assets/stylesheets/spa-demo.css
+echo -e "// SPA Demo Javascript Manifest File" >> app/assets/javascripts/spa-demo.js
+```
+Create initializer config file
+echo -e "Rails.application.config.assets.version = '1.0'" >> config/initializers/assets.rb
+echo -e "Rails.application.config.assets.precompile += %w( spa-demo.js spa-demo.css )" >> config/initializers/assets.rb
+```
+Update ui view in app/views/ui/index.html.erb with
+```
+<!DOCTYPE html>
+<html lang="en" ng-app="spa-demo">
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=Edge,chrome=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <%= stylesheet_link_tag    "spa-demo", :media => "all" %>
+    <%= javascript_include_tag "spa-demo" %>
+  </head>
+  <body>
+
+    <div class="container">
+      <h1>Hello</h1>
+      <span>(from app/views/ui/index.html.erb)</span>
+      <div ui-view></div>
+    </div>
+
+  </body>
+</html>
+```
+Add boostrap to CSS assets
+```
+/*
+ * SPA Demo Stylesheet Manifest File
+ *
+ *= require bootstrap
+ */
+```
+Add scripts to JS assets
+```
+// SPA Demo Javascript Manifest File
+//= require jquery2
+//= require bootstrap
+//= require angular
+//= require angular-ui-router
+//= require angular-resource
+```
+Run server and check in browser that it is in place
+```
+rails s
+```
+Define an application adding ng-app and check in browser for error
+```
+<html lang="en" ng-app="spa-demo">
+...
+<div ui-view></div>div>
+```
+Deploy to staging hosting and check for error
+```
+git push staging asset-pipeline:master
+```
+### CREATING SPA-APP
+Add folders as following
+```
+mkdir app/assets/javascripts/spa-demo
+mkdir app/assets/javascripts/spa-demo/pages
+```
+Create app module at app/assets/javascripts/spa-demo/app.module.js
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo", ["ui.router"]);
+
+})();
+```
+Create simple page at app/assets/javascripts/spa-demo/pages/main/html
+```
+<div>
+  <h2>Sample App</h2>
+  <span>(from spa-demo/pages/main.html)</span>
+  <sd-foos></sd-foos>
+</div>
+```
+Create constant at app/assets/javascripts/spa-demo/app.constant.js.erb
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo")
+    .constant("spa-demo.APP_CONFIG", {
+
+      main_page_html: "<%= asset_path('spa-demo/pages/main.html') %>"
+
+    });
+
+})();
+```
+Create router at app/assets/javascripts/spa-demo/app.router.js
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo")
+    .config(RouterFunction);
+
+  RouterFunction.$inject = ["$stateProvider",
+                            "$urlRouterProvider", 
+                            "spa-demo.APP_CONFIG"];
+
+  function RouterFunction($stateProvider, $urlRouterProvider, APP_CONFIG) {
+    $stateProvider
+    .state("home",{
+      url: "/",
+      templateUrl: APP_CONFIG.main_page_html,
+      // controller: ,
+      // controllerAs: ,
+    })
+
+    $urlRouterProvider.otherwise("/");
+  }
+})();
+```
+Add our scripts to app manifest app/assets/javascripts/spa-demo.js
+```
+//= require spa-demo/app.module
+//= require spa-demo/app.router
+//= require spa-demo/app.constant
+```
+Create a branch foo-ui?
+```
+create
+```
+Add server_url to router.js
+```
+server_url: "<%= ENV['RAILS_API_URL'] %>",
+```
+Create 'foos' folder and 'foos.module' in spa-demo
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo.foos", ["ngResource"]);
+
+})();
+```
+Add script to the manifest
+```
+//= require spa-demo/foos/foos.module
+```
+Add a dependensy to app.module.js
+```
+  angular
+    .module("spa-demo", [
+      "ui.router",
+      "spa-demo.foos"
+    ]);
+```
+Create a factory for spa-demo.foos module at app/assets/javascripts/spa-demo/foos/foos.service.js
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo.foos")
+    .factory("spa-demo.foos.Foo", FooFactory);
+
+  FooFactory.$inject = ["$resource", "spa-demo.APP_CONFIG"];
+  function FooFactory($resource, APP_CONFIG) {
+    return $resource(APP_CONFIG.server_url + "/api/foos/:id",
+      { id: '@id'},
+      { update: { method: "PUT" }
+      }
+      );
+  }
+})();
+```
+Add service to the manifest
+```
+//= require spa-demo/foos/foos.service
+```
+Create a controller for foos 
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo.foos")
+    .controller("spa-demo.foos.FoosController", FoosController);
+
+  FoosController.$inject = ["spa-demo.foos.Foo"];
+
+  function FoosController(Foo) {
+      var vm = this;
+      vm.foos;
+      vm.foo;
+
+      activate();
+      return;
+      ////////////////
+      function activate() {
+        newFoo();
+      }
+
+      function newFoo() {
+        vm.foo = new Foo();
+      }
+      function handleError(response) {
+        console.log(response);
+      } 
+      function edit(object, index) {
+      }
+      function create() {
+      }
+      function update() {
+      }
+      function remove() {
+      }
+      function removeElement(elements, element) {
+      }      
+  }
+})();
+```
+Add service to the manifest
+```
+//= require spa-demo/foos/foos.controller
+```
+Create simple html for foos in foos folder
+```
+<div>
+  <h3>Foos</h3>
+  <span>(from spa-demo/foos/foos.html)</span>
+
+</div>
+```
+Create a directive foos for previous html 
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo.foos")
+    .directive("sdFoos", FoosDirective);
+
+  FoosDirective.$inject = ["spa-demo.APP_CONFIG"];
+
+  function FoosDirective(APP_CONFIG) {
+    var directive = {
+        templateUrl: APP_CONFIG.foos_html,
+        replace: true,
+        bindToController: true,
+        controller: "spa-demo.foos.FoosController",
+        controllerAs: "foosVM",
+        restrict: "E",
+        scope: {},
+        link: link
+    };
+    return directive;
+
+    function link(scope, element, attrs) {
+      console.log("FoosDirective", scope);
+    }
+  }
+
+})();
+```
+Update constant with foos_html
+```
+foos_html: "<%= asset_path('spa-demo/foos/foos.html') %>"
+```
+Add directive to the manifest
+```
+//= require spa-demo/foos/foos.directive
+```
+Update main page in pages folder
+```
+<sd-foos></sd-foos>
+```
+Add folder spa-demo in assets/stylesheets and layout.css
+```
+/* 
+ * layout.css
+ */
+
+ body {
+  background-color: #d2b48c;
+ }
+```
+Add layout.css to css manifest
+```
+/*
+ * SPA Demo Stylesheet Manifest File
+ *
+ *= require bootstrap
+ *= require spa-demo/layout
+ */
+```
+Create some foos in DB
+```
+rails c
+(1..5).each { |i| Foo.create(:name=>"test#{i}") }
+Foo.count
+```
+Add ng-repeat to foos.html]
+```
+  <ul>
+    <li ng-repeat="foo in foosVM.foos | orderBy:'name'">
+      <a ng-click="foosVM.edit(foo)">{{foo.name}}</a>
+    </li>
+  </ul>
+```
+Add form to foos.html
+```
+  <form>
+    <div>
+      <label>Name:</label>
+      <input name="name"
+              ng-model="foosVM.foo.name"
+              required="required"/>
+    </div>
+
+    <button ng-if="!foosVM.foo.id" 
+             type="submit"
+             ng-click="foosVM.create()">Create Foo</button>  
+    <div ng-if="foosVM.foo.id">
+      <button type="submit"
+              ng-click="foosVM.update()">Update Foo</button>
+      <button type="submit"
+              ng-click="foosVM.remove()">Delete Foo</button>
+    </div>               
+  </form>
+```
+Update FooService - FooFactory and new function
+```
+  function FooFactory($resource, APP_CONFIG) {
+    return $resource(APP_CONFIG.server_url + "/api/foos/:id",
+      { id: '@id'},
+      { 
+        update: { method: "PUT",
+                  transformRequest: buildNestedBody },
+        save: { method: "POST",
+                  transformRequest: buildNestedBody }
+      }
+      );
+  }
+
+  //nests the default payload below a "foo" element 
+  //as required by default by Rails API resources
+  function buildNestedBody(data) {
+   return angular.toJson({foo: data})
+  }  
+```
+Update foo controller
+```
+(function() {
+  "use strict";
+
+  angular
+    .module("spa-demo.foos")
+    .controller("spa-demo.foos.FoosController", FoosController);
+
+  FoosController.$inject = ["spa-demo.foos.Foo"];
+
+  function FoosController(Foo) {
+      var vm = this;
+      vm.foos;
+      vm.foo;
+      vm.edit   = edit;
+      vm.create = create;
+      vm.update = update;
+      vm.remove = remove;      
+
+      activate();
+      return;
+      ////////////////
+      function activate() {
+        newFoo();
+        vm.foos = Foo.query();
+      }
+
+      function newFoo() {
+        vm.foo = new Foo();
+      }
+      function handleError(response) {
+        console.log(response);
+      } 
+      function edit(object) {
+        console.log("selected", object);
+        vm.foo = object;        
+      }
+
+      function create() {
+        //console.log("creating foo", vm.foo);
+        vm.foo.$save()
+          .then(function(response){
+            //console.log(response);
+            vm.foos.push(vm.foo);
+            newFoo();
+          })
+          .catch(handleError);        
+      }
+
+      function update() {
+        //console.log("update", vm.foo);
+        vm.foo.$update()
+          .then(function(response){
+            //console.log(response);
+        })
+        .catch(handleError);        
+      }
+
+      function remove() {
+        //console.log("remove", vm.foo);
+        vm.foo.$delete()
+          .then(function(response){
+            //console.log(response);
+            //remove the element from local array
+            removeElement(vm.foos, vm.foo);
+            //vm.foos = Foo.query();
+            //replace edit area with prototype instance
+            newFoo();
+          })
+          .catch(handleError);                
+      }
+
+
+      function removeElement(elements, element) {
+        for (var i=0; i<elements.length; i++) {
+          if (elements[i].id == element.id) {
+            elements.splice(i,1);
+            break;
+          }        
+        }        
+      }      
+  }
+})();
+```
